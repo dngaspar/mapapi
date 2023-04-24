@@ -28,8 +28,8 @@ def get_walking_time(org_location):
     # 徒歩15分以内の場所を取得するための歩行時間の最大値を設定します。
     max_walking_time = 15 * 60  # 15分を秒に変換
 
-    # 取得する場所のカテゴリーを設定します。
-    queries = ["公共交通機関", "主な施設", "教育機関", "病院"]
+    # # 取得する場所のカテゴリーを設定します。
+    # queries = ["公共交通機関", "主な施設", "教育機関", "病院"]
 
     # 取得した場所の情報を格納するための辞書を初期化します。
     result = {
@@ -40,28 +40,41 @@ def get_walking_time(org_location):
     }
 
     # カテゴリーごとに場所を取得して、歩行時間が15分以内の場所のみを格納します。
-    for query in queries:
-        # 一定の半径内のすべての近くの場所を取得します
-        places_result = gmaps.places_nearby(
-            location=org_latlng, radius=5000, type=query
+    # for query in queries:
+    # 一定の半径内のすべての近くの場所を取得します
+    params = {"location": org_latlng, "radius": 5000, "type": "建物", "language": "ja"}
+
+    places_result = gmaps.places_nearby(**params)
+
+    # 初期結果から建物のリストを抽出します
+    buildings = places_result["results"]
+
+    # 結果の追加ページがあるかどうかをチェックします
+    while "next_page_token" in places_result:
+        # ページトークンを使用して次のAPIリクエストを設定します
+        next_page_token = places_result["next_page_token"]
+        params["page_token"] = next_page_token
+        places_result = gmaps.places_nearby(**params)
+        # API結果から建物のリストを抽出して、マスターリストに追加します
+        buildings += places_result["results"]
+
+    for place in buildings:
+        latlng = (
+            place["geometry"]["location"]["lat"],
+            place["geometry"]["location"]["lng"],
         )
-        for place in places_result["results"]:
-            latlng = (
-                place["geometry"]["location"]["lat"],
-                place["geometry"]["location"]["lng"],
-            )
-            walking_time_result = gmaps.distance_matrix(
-                origins=org_latlng, destinations=latlng, mode=mode
-            )
-            walking_time = walking_time_result["rows"][0]["elements"][0]["duration"][
-                "value"
-            ]
-            if walking_time <= max_walking_time:
-                result["カテゴリー"].append(query)
-                result["出発地"].append(place["name"])
-                # result["目的地"].append(org_location)
-                result["歩行時間"].append(f"{walking_time // 60}分")
-                # print(place['name'], walking_time // 60, '分')
+        walking_time_result = gmaps.distance_matrix(
+            origins=org_latlng, destinations=latlng, mode=mode
+        )
+        walking_time = walking_time_result["rows"][0]["elements"][0]["duration"][
+            "value"
+        ]
+        if walking_time <= max_walking_time:
+            result["カテゴリー"].append("all")
+            result["出発地"].append(place["name"])
+            # result["目的地"].append(org_location)
+            result["歩行時間"].append(f"{walking_time // 60}分")
+            # print(place['name'], walking_time // 60, '分')
 
     # 結果をデータフレームに変換して返す
     df = pd.DataFrame(result)
